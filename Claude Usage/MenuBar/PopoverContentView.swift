@@ -18,11 +18,7 @@ struct VisualEffectBackground: NSViewRepresentable {
         // Solid tint overlay for more density
         let tintView = NSView()
         tintView.wantsLayer = true
-        if NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
-            tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.25).cgColor
-        } else {
-            tintView.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.4).cgColor
-        }
+        tintView.layer?.backgroundColor = ClaudeTheme.popoverTintCGColor()
         tintView.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(tintView)
 
@@ -44,11 +40,7 @@ struct VisualEffectBackground: NSViewRepresentable {
         // Update tint for appearance changes
         if let tintView = nsView.subviews.last {
             tintView.wantsLayer = true
-            if NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
-                tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.25).cgColor
-            } else {
-                tintView.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.4).cgColor
-            }
+            tintView.layer?.backgroundColor = ClaudeTheme.popoverTintCGColor()
         }
     }
 }
@@ -63,9 +55,8 @@ struct PopoverContentView: View {
     @State private var showInsights = false
     // Drives a custom entrance animation. The native NSPopover open animation is
     // disabled (see MenuBarManager) because its animated window resize recurses
-    // infinitely on macOS 26/27; this fades/scales the content in from the top
-    // instead — a pure SwiftUI transform on a fixed-size view, so it can't trigger
-    // the window-resize loop.
+    // infinitely on macOS 26/27; this fades the content in instead, a pure SwiftUI
+    // opacity change on a fixed-size view, so it can't trigger the window-resize loop.
     @State private var appeared = false
     @StateObject private var profileManager = ProfileManager.shared
 
@@ -110,12 +101,12 @@ struct PopoverContentView: View {
                 status: manager.status,
                 isRefreshing: isRefreshing,
                 onRefresh: {
-                    withAnimation(.easeInOut(duration: 0.3)) {
+                    withAnimation(ClaudeMotion.stateChange) {
                         isRefreshing = true
                     }
                     onRefresh()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
+                        withAnimation(ClaudeMotion.stateChange) {
                             isRefreshing = false
                         }
                     }
@@ -132,7 +123,7 @@ struct PopoverContentView: View {
                 StatusBannerView(
                     icon: "exclamationmark.triangle.fill",
                     message: "popover.banner.credentials_expired".localized,
-                    color: .orange
+                    color: ClaudeTheme.usageWarning
                 ) {
                     onPreferences()
                 }
@@ -140,7 +131,7 @@ struct PopoverContentView: View {
                 StatusBannerView(
                     icon: "arrow.clockwise.circle.fill",
                     message: String(format: "popover.banner.refresh_failed".localized, manager.consecutiveRefreshFailures),
-                    color: .yellow
+                    color: ClaudeTheme.usageWarning
                 ) {
                     onRefresh()
                 }
@@ -150,7 +141,7 @@ struct PopoverContentView: View {
                 StatusBannerView(
                     icon: "clock.fill",
                     message: String(format: "popover.banner.updated_ago".localized, minutesAgo),
-                    color: .orange
+                    color: ClaudeTheme.usageWarning
                 ) {
                     onRefresh()
                 }
@@ -222,10 +213,9 @@ struct PopoverContentView: View {
         .frame(width: 280)
         .background(VisualEffectBackground())
         .opacity(appeared ? 1 : 0)
-        .scaleEffect(appeared ? 1 : 0.96, anchor: .top)
         .onAppear {
             appeared = false
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+            withAnimation(ClaudeMotion.popoverAppear) {
                 appeared = true
             }
         }
@@ -247,6 +237,11 @@ struct ProfileSwitcherCompact: View {
     @StateObject private var profileManager = ProfileManager.shared
     @State private var isHovered = false
     let onManageProfiles: () -> Void
+
+    private var headerLabel: String {
+        if let plan = profileManager.activeProfile?.planDisplayName { return plan }
+        return profileManager.activeProfile?.name ?? "popover.no_profile".localized
+    }
 
     var body: some View {
         Menu {
@@ -274,7 +269,7 @@ struct ProfileSwitcherCompact: View {
                             if profile.hasCliAccount {
                                 Image(systemName: "terminal.fill")
                                     .font(.system(size: 9))
-                                    .foregroundColor(.adaptiveGreen)
+                                    .foregroundColor(ClaudeTheme.statusOperational)
                             }
 
                             if profile.claudeSessionKey != nil {
@@ -304,7 +299,7 @@ struct ProfileSwitcherCompact: View {
                 }
             }
         } label: {
-            Text(profileManager.activeProfile?.name ?? "popover.no_profile".localized)
+            Text(headerLabel)
                 .font(.system(size: 13, weight: .bold))
                 .foregroundColor(.primary)
                 .lineLimit(1)
@@ -350,7 +345,7 @@ struct ProfileSwitcherBar: View {
                             if profile.hasCliAccount {
                                 Image(systemName: "terminal.fill")
                                     .font(.system(size: 9))
-                                    .foregroundColor(.adaptiveGreen)
+                                    .foregroundColor(ClaudeTheme.statusOperational)
                             }
 
                             if profile.claudeSessionKey != nil {
@@ -436,7 +431,7 @@ struct ProfileSwitcherBar: View {
         // See ProfileSwitcherCompact: suppress the first-responder focus ring.
         .focusEffectDisabled()
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(ClaudeMotion.hover) {
                 isHovered = hovering
             }
         }
@@ -468,11 +463,11 @@ struct SmartHeader: View {
 
     private var statusColor: Color {
         switch status.indicator.color {
-        case .green: return .adaptiveGreen
-        case .yellow: return .yellow
-        case .orange: return .orange
-        case .red: return .red
-        case .gray: return .gray
+        case .green: return ClaudeTheme.statusOperational
+        case .yellow: return ClaudeTheme.statusDegraded
+        case .orange: return ClaudeTheme.statusDegraded
+        case .red: return ClaudeTheme.statusOutage
+        case .gray: return ClaudeTheme.statusUnknown
         }
     }
 
@@ -495,6 +490,10 @@ struct SmartHeader: View {
         return "?"
     }
 
+    private var headerStatusLabel: String {
+        profileManager.activeProfile?.accountEmail ?? status.description
+    }
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
@@ -511,9 +510,11 @@ struct SmartHeader: View {
                             .fill(statusColor)
                             .frame(width: 6, height: 6)
 
-                        Text(status.description)
+                        Text(headerStatusLabel)
                             .font(.system(size: 9, weight: .medium))
                             .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                     }
                 }
                 .buttonStyle(.plain)
@@ -576,7 +577,7 @@ struct HeaderIconButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(ClaudeMotion.hover) {
                 isHovered = hovering
             }
         }
@@ -591,6 +592,12 @@ struct SmartUsageDashboard: View {
     @StateObject private var profileManager = ProfileManager.shared
     private var capabilities: ProviderCapabilities {
         provider.descriptor.capabilities
+    }
+
+    private var showsFableRow: Bool {
+        if usage.fableWeeklyTokensUsed > 0 { return true }
+        guard profileManager.activeProfile?.isMaxPlan == true else { return false }
+        return usage.fableWeeklyResetTime != nil || usage.fableWeeklyPercentage > 0
     }
 
     private var showRemainingPercentage: Bool {
@@ -669,7 +676,7 @@ struct SmartUsageDashboard: View {
                 timeDisplay: timeDisplay
             )
 
-            if usage.fableWeeklyTokensUsed > 0 {
+            if showsFableRow {
                 UsageRow(
                     title: "menubar.fable_usage".localized,
                     tag: "menubar.weekly".localized,
@@ -726,8 +733,8 @@ struct SmartUsageDashboard: View {
                             .foregroundColor(.secondary)
                         Spacer()
                         Text(String(format: "%.2f %@", balance / 100.0, balanceCurrency.uppercased()))
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundColor(.adaptiveGreen)
+                            .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                            .foregroundColor(ClaudeTheme.statusOperational)
                     }
                 }
             }
@@ -749,7 +756,7 @@ struct SmartUsageDashboard: View {
                     if usage.creditsUnlimited == true {
                         Text("popover.credits_unlimited".localized)
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.adaptiveGreen)
+                            .foregroundColor(ClaudeTheme.statusOperational)
                     } else if let balance = usage.creditsBalance {
                         Text("popover.credits_balance".localized(with: String(format: "%.2f", balance)))
                             .font(.system(size: 10, weight: .medium))
@@ -830,9 +837,9 @@ struct UsageRow: View {
 
     private var statusColor: Color {
         switch statusLevel {
-        case .safe: return .adaptiveGreen
-        case .moderate: return .orange
-        case .critical: return .red
+        case .safe: return ClaudeTheme.usageSafe
+        case .moderate: return ClaudeTheme.usageWarning
+        case .critical: return ClaudeTheme.usageCritical
         }
     }
 
@@ -869,7 +876,7 @@ struct UsageRow: View {
                 Spacer()
 
                 Text("\(Int(displayPercentage))%")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .font(.system(size: 13, weight: .semibold).monospacedDigit())
                     .foregroundColor(statusColor)
             }
 
@@ -877,12 +884,12 @@ struct UsageRow: View {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 2.5)
-                        .fill(Color.primary.opacity(0.08))
+                        .fill(ClaudeTheme.trackFill)
 
                     RoundedRectangle(cornerRadius: 2.5)
                         .fill(statusColor)
                         .frame(width: geometry.size.width * min(displayPercentage / 100.0, 1.0))
-                        .animation(.easeInOut(duration: 0.6), value: displayPercentage)
+                        .animation(ClaudeMotion.valueChange, value: displayPercentage)
                 }
                 .overlay(alignment: .leading) {
                     if let fraction = timeMarkerFraction {
@@ -932,7 +939,7 @@ struct ContextualInsights: View {
         if usage.effectiveSessionPercentage > 80 {
             result.append(Insight(
                 icon: "exclamationmark.triangle.fill",
-                color: .orange,
+                color: ClaudeTheme.usageWarning,
                 title: "usage.high_session".localized,
                 description: "usage.high_session.desc".localized
             ))
@@ -941,7 +948,7 @@ struct ContextualInsights: View {
         if usage.weeklyPercentage > 90 {
             result.append(Insight(
                 icon: "clock.fill",
-                color: .red,
+                color: ClaudeTheme.usageCritical,
                 title: "usage.weekly_approaching".localized,
                 description: "usage.weekly_approaching.desc".localized
             ))
@@ -950,7 +957,7 @@ struct ContextualInsights: View {
         if usage.effectiveSessionPercentage < 20 && usage.weeklyPercentage < 30 {
             result.append(Insight(
                 icon: "checkmark.circle.fill",
-                color: .adaptiveGreen,
+                color: ClaudeTheme.statusOperational,
                 title: "usage.efficient".localized,
                 description: "usage.efficient.desc".localized
             ))
@@ -1022,14 +1029,19 @@ struct SmartFooter: View {
 struct ClaudeStatusRow: View {
     let status: ClaudeStatus
     @State private var isHovered = false
+    @StateObject private var profileManager = ProfileManager.shared
+
+    private var primaryLabel: String {
+        profileManager.activeProfile?.accountEmail ?? status.description
+    }
 
     private var statusColor: Color {
         switch status.indicator.color {
-        case .green: return .adaptiveGreen
-        case .yellow: return .yellow
-        case .orange: return .orange
-        case .red: return .red
-        case .gray: return .gray
+        case .green: return ClaudeTheme.statusOperational
+        case .yellow: return ClaudeTheme.statusDegraded
+        case .orange: return ClaudeTheme.statusDegraded
+        case .red: return ClaudeTheme.statusOutage
+        case .gray: return ClaudeTheme.statusUnknown
         }
     }
 
@@ -1044,10 +1056,11 @@ struct ClaudeStatusRow: View {
                     .fill(statusColor)
                     .frame(width: 8, height: 8)
 
-                Text(status.description)
+                Text(primaryLabel)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.primary)
                     .lineLimit(1)
+                    .truncationMode(.middle)
 
                 Spacer()
 
@@ -1059,12 +1072,12 @@ struct ClaudeStatusRow: View {
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(isHovered ? Color.accentColor.opacity(0.1) : Color.clear)
+                    .fill(ClaudeTheme.hoverFill(isHovered))
             )
         }
         .buttonStyle(.plain)
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.1)) {
+            withAnimation(ClaudeMotion.hover) {
                 isHovered = hovering
             }
         }
@@ -1097,7 +1110,7 @@ struct SmartActionButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(ClaudeMotion.hover) {
                 isHovered = hovering
             }
         }
@@ -1127,7 +1140,7 @@ struct APICostCard: View {
                 // Total cost
                 if let formatted = apiUsage.formattedAPICost {
                     Text(formatted)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(.system(size: 13, weight: .semibold).monospacedDigit())
                         .foregroundColor(.primary)
                 }
             }
@@ -1231,7 +1244,7 @@ struct DailyCostChart: View {
                     AxisValueLabel {
                         if let v = value.as(Double.self) {
                             Text(formatDollars(v, max: maxValue))
-                                .font(.system(size: 7, design: .rounded))
+                                .font(.system(size: 7).monospacedDigit())
                                 .foregroundColor(.secondary.opacity(0.6))
                         }
                     }
@@ -1263,7 +1276,7 @@ struct APICostSourceRow: View {
         VStack(spacing: 4) {
             // Source header (tappable to expand)
             Button(action: {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(ClaudeMotion.stateChange) {
                     isExpanded.toggle()
                 }
             }) {
@@ -1347,9 +1360,9 @@ struct APIUsageCard: View {
 
     private var usageColor: Color {
         switch statusLevel {
-        case .safe: return .adaptiveGreen
-        case .moderate: return .orange
-        case .critical: return .red
+        case .safe: return ClaudeTheme.usageSafe
+        case .moderate: return ClaudeTheme.usageWarning
+        case .critical: return ClaudeTheme.usageCritical
         }
     }
 
@@ -1370,7 +1383,7 @@ struct APIUsageCard: View {
                 Spacer()
 
                 Text("\(Int(displayPercentage))%")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .font(.system(size: 13, weight: .semibold).monospacedDigit())
                     .foregroundColor(usageColor)
             }
 
@@ -1378,12 +1391,12 @@ struct APIUsageCard: View {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 2.5)
-                        .fill(Color.primary.opacity(0.08))
+                        .fill(ClaudeTheme.trackFill)
 
                     RoundedRectangle(cornerRadius: 2.5)
                         .fill(usageColor)
                         .frame(width: geometry.size.width * min(displayPercentage / 100.0, 1.0))
-                        .animation(.easeInOut(duration: 0.6), value: displayPercentage)
+                        .animation(ClaudeMotion.valueChange, value: displayPercentage)
                 }
             }
             .frame(height: 4)
