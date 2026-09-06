@@ -85,6 +85,15 @@ extension Date {
         return formatter.string(from: self)
     }
 
+    /// Returns a short calendar date (e.g., "Sep 8"), for reset points that are
+    /// days away and where a clock time alone would not tell you much.
+    func resetShortDateString(timezone: TimeZone = .current) -> String {
+        let formatter = DateFormatter()
+        formatter.timeZone = timezone
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: self)
+    }
+
     /// Returns time remaining rounded to full hours (e.g., "→2H", "→1H", "→<1H")
     func timeRemainingHoursString(from now: Date = Date()) -> String {
         let interval = self.timeIntervalSince(now)

@@ -66,7 +66,7 @@ struct MetricIconCard: View {
                 }
 
                 // Metric-specific options
-                if metricType == .session && (config.iconStyle == .battery || config.iconStyle == .progressBar) {
+                if (metricType == .session || metricType == .week) && (config.iconStyle == .battery || config.iconStyle == .progressBar) {
                     Divider()
                         .padding(.vertical, Spacing.xs)
 

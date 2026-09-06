@@ -146,7 +146,7 @@ final class MenuBarIconRenderer {
         let percentage: Double
         let displayText: String
         let statusLevel: UsageStatusLevel
-        let sessionResetTime: Date?  // Only populated for session metric
+        let resetTime: Date?  // Populated for session and week metrics
     }
 
     private func getMetricData(
@@ -181,7 +181,7 @@ final class MenuBarIconRenderer {
                 percentage: displayPercentage,
                 displayText: "\(Int(displayPercentage))%",
                 statusLevel: statusLevel,
-                sessionResetTime: usage.sessionResetTime
+                resetTime: usage.sessionResetTime
             )
 
         case .week:
@@ -219,7 +219,7 @@ final class MenuBarIconRenderer {
                 percentage: displayPercentage,
                 displayText: displayText,
                 statusLevel: statusLevel,
-                sessionResetTime: nil
+                resetTime: usage.weeklyResetTime
             )
 
         case .api:
@@ -228,7 +228,7 @@ final class MenuBarIconRenderer {
                     percentage: showRemaining ? 100 : 0,  // 100% remaining or 0% used when no data
                     displayText: "N/A",
                     statusLevel: .safe,
-                    sessionResetTime: nil
+                    resetTime: nil
                 )
             }
 
@@ -256,7 +256,7 @@ final class MenuBarIconRenderer {
                 percentage: displayPercentage,
                 displayText: displayText,
                 statusLevel: statusLevel,
-                sessionResetTime: nil
+                resetTime: nil
             )
         }
     }
@@ -338,7 +338,7 @@ final class MenuBarIconRenderer {
             drawPaceMarkerTick(tickPath, paceStatus: paceStatus, showPaceMarker: showPaceMarker, isDarkMode: isDarkMode)
         }
 
-        let showsClockLabel = showNextSessionTime && metricType == .session && metricData.sessionResetTime != nil
+        let showsClockLabel = showNextSessionTime && metricType != .api && metricData.resetTime != nil
 
         if showsClockLabel {
             let barRect = NSRect(x: xOffset + 1, y: barY, width: barWidth, height: barHeight)
@@ -365,13 +365,18 @@ final class MenuBarIconRenderer {
 
         // Show metric label if enabled, otherwise show percentage
         let text: NSString
-        if showsClockLabel, let resetTime = metricData.sessionResetTime {
+        if showsClockLabel, let resetTime = metricData.resetTime {
+            // Session resets within hours so the clock carries the information;
+            // the weekly window is days out, where the date matters instead.
+            let stamp = metricType == .session
+                ? resetTime.resetClockString()
+                : resetTime.resetShortDateString()
             if showIconName {
-                // Show "S 1:50AM" when labels enabled
-                text = "S \(resetTime.resetClockString())" as NSString
+                // Show "S 1:50AM" or "W Sep 8" when labels enabled
+                text = "\(metricType == .session ? "S" : "W") \(stamp)" as NSString
             } else {
-                // Show just "1:50AM" when labels disabled
-                text = resetTime.resetClockString() as NSString
+                // Show just "1:50AM" or "Sep 8" when labels disabled
+                text = stamp as NSString
             }
         } else if showIconName {
             // Show full word: "Session" or "Week"
@@ -470,9 +475,12 @@ final class MenuBarIconRenderer {
                 drawPaceMarkerTick(tickPath, paceStatus: paceStatus, showPaceMarker: showPaceMarker, isDarkMode: isDarkMode)
             }
 
-            // Draw session reset time inside the fill area if enabled and this is a session metric
-            if showNextSessionTime && metricType == .session, let resetTime = metricData.sessionResetTime {
-                let timeString = resetTime.timeRemainingHoursString() as NSString
+            // Draw the reset stamp inside the fill area if enabled; session shows hours
+            // remaining, week shows the reset date since it is days out
+            if showNextSessionTime && metricType != .api, let resetTime = metricData.resetTime {
+                let timeString = (metricType == .session
+                    ? resetTime.timeRemainingHoursString()
+                    : resetTime.resetShortDateString()) as NSString
                 let timeFont = NSFont.systemFont(ofSize: 5.5, weight: .medium)
                 let timeAttributes: [NSAttributedString.Key: Any] = [
                     .font: timeFont,
