@@ -76,6 +76,15 @@ extension Date {
         return formatter.string(from: self)
     }
 
+    /// Returns just the clock time of the reset (e.g., "1:50AM" or "01:50"),
+    /// compact enough for the menu bar icon label.
+    func resetClockString(timezone: TimeZone = .current) -> String {
+        let formatter = DateFormatter()
+        formatter.timeZone = timezone
+        formatter.dateFormat = SharedDataStore.shared.uses24HourTime() ? "HH:mm" : "h:mma"
+        return formatter.string(from: self)
+    }
+
     /// Returns time remaining rounded to full hours (e.g., "→2H", "→1H", "→<1H")
     func timeRemainingHoursString(from now: Date = Date()) -> String {
         let interval = self.timeIntervalSince(now)

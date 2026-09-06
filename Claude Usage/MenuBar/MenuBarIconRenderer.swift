@@ -338,6 +338,25 @@ final class MenuBarIconRenderer {
             drawPaceMarkerTick(tickPath, paceStatus: paceStatus, showPaceMarker: showPaceMarker, isDarkMode: isDarkMode)
         }
 
+        let showsClockLabel = showNextSessionTime && metricType == .session && metricData.sessionResetTime != nil
+
+        if showsClockLabel {
+            let barRect = NSRect(x: xOffset + 1, y: barY, width: barWidth, height: barHeight)
+            let filledRect = NSRect(
+                x: xOffset + 1 + padding,
+                y: barY + padding,
+                width: max(fillWidth, 0),
+                height: barHeight - padding * 2
+            )
+            drawPercentageInsideBar(
+                percentText: "\(Int(metricData.percentage))%",
+                barRect: barRect,
+                filledRect: filledRect,
+                onEmptyColor: textColor,
+                onFilledColor: isDarkMode ? .black : .white
+            )
+        }
+
         // Label BELOW the battery (replaces percentage text)
         let textAttributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 9, weight: .medium),
@@ -346,13 +365,13 @@ final class MenuBarIconRenderer {
 
         // Show metric label if enabled, otherwise show percentage
         let text: NSString
-        if showNextSessionTime && metricType == .session, let resetTime = metricData.sessionResetTime {
+        if showsClockLabel, let resetTime = metricData.sessionResetTime {
             if showIconName {
-                // Show "S (→2H)" when labels enabled
-                text = "S (\(resetTime.timeRemainingHoursString()))" as NSString
+                // Show "S 1:50AM" when labels enabled
+                text = "S \(resetTime.resetClockString())" as NSString
             } else {
-                // Show just "→2H" when labels disabled
-                text = resetTime.timeRemainingHoursString() as NSString
+                // Show just "1:50AM" when labels disabled
+                text = resetTime.resetClockString() as NSString
             }
         } else if showIconName {
             // Show full word: "Session" or "Week"
@@ -1373,6 +1392,37 @@ final class MenuBarIconRenderer {
     /// Draws a pace-colored tick mark. When showPaceMarker is on and pace data is available,
     /// the tick color reflects the 6-tier pace urgency (green→purple) regardless of color mode.
     /// Otherwise falls back to the menu bar foreground color (current upstream behavior).
+    private func drawPercentageInsideBar(
+        percentText: String,
+        barRect: NSRect,
+        filledRect: NSRect,
+        onEmptyColor: NSColor,
+        onFilledColor: NSColor
+    ) {
+        let font = NSFont.systemFont(ofSize: 7, weight: .semibold)
+        let text = percentText as NSString
+        let size = text.size(withAttributes: [.font: font])
+        guard size.width <= barRect.width - 2 else { return }
+
+        let origin = NSPoint(
+            x: barRect.minX + (barRect.width - size.width) / 2,
+            y: barRect.minY + (barRect.height - size.height) / 2
+        )
+
+        NSGraphicsContext.saveGraphicsState()
+        NSBezierPath(rect: filledRect).setClip()
+        text.draw(at: origin, withAttributes: [.font: font, .foregroundColor: onFilledColor])
+        NSGraphicsContext.restoreGraphicsState()
+
+        NSGraphicsContext.saveGraphicsState()
+        let emptyRegion = NSBezierPath(rect: barRect)
+        emptyRegion.append(NSBezierPath(rect: filledRect))
+        emptyRegion.windingRule = .evenOdd
+        emptyRegion.setClip()
+        text.draw(at: origin, withAttributes: [.font: font, .foregroundColor: onEmptyColor])
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
     private func drawPaceMarkerTick(
         _ path: NSBezierPath,
         paceStatus: PaceStatus?,
