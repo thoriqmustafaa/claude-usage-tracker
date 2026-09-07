@@ -111,6 +111,7 @@ final class MenuBarIconRenderer {
                 colorMode: colorMode,
                 singleColorHex: singleColorHex,
                 showIconName: showIconName,
+                showNextSessionTime: showNextSessionTime,
                 paceStatus: paceStatus,
                 showPaceMarker: showPaceMarker
             )
@@ -508,6 +509,7 @@ final class MenuBarIconRenderer {
         colorMode: MenuBarColorMode,
         singleColorHex: String,
         showIconName: Bool,
+        showNextSessionTime: Bool = false,
         paceStatus: PaceStatus? = nil,
         showPaceMarker: Bool = false
     ) -> NSImage {
@@ -530,6 +532,52 @@ final class MenuBarIconRenderer {
         let textSize = fullText.size(withAttributes: attributes)
         let hasPaceDot = showPaceMarker && paceStatus != nil
         let paceDotExtra: CGFloat = hasPaceDot ? 8 : 0  // dot(4) + gaps(2+2)
+
+        let resetStamp: String? = {
+            guard showNextSessionTime, metricType != .api, let reset = metricData.resetTime else { return nil }
+            return metricType == .session ? reset.resetClockString() : reset.resetShortDateString()
+        }()
+
+        if let resetStamp {
+            let stampFont = NSFont.systemFont(ofSize: 9, weight: .medium)
+            let stampAttributes: [NSAttributedString.Key: Any] = [
+                .font: stampFont,
+                .foregroundColor: menuBarForegroundColor(isDarkMode: isDarkMode).withAlphaComponent(0.85)
+            ]
+            let stampSize = resetStamp.size(withAttributes: stampAttributes)
+
+            let topRowWidth = textSize.width + paceDotExtra
+            let totalWidth = max(topRowWidth, stampSize.width) + 4
+            let totalHeight: CGFloat = 28
+
+            let stacked = NSImage(size: NSSize(width: totalWidth, height: totalHeight))
+            stacked.lockFocus()
+            defer { stacked.unlockFocus() }
+
+            let topX = (totalWidth - topRowWidth) / 2
+            let topY = totalHeight - textSize.height - 1
+            fullText.draw(at: NSPoint(x: topX, y: topY), withAttributes: attributes)
+
+            if let pace = paceStatus, showPaceMarker {
+                let dotSize: CGFloat = 4.0
+                let dotRect = NSRect(
+                    x: topX + textSize.width + 2,
+                    y: topY + (textSize.height - dotSize) / 2,
+                    width: dotSize,
+                    height: dotSize
+                )
+                pace.color.setFill()
+                NSBezierPath(ovalIn: dotRect).fill()
+            }
+
+            resetStamp.draw(
+                at: NSPoint(x: (totalWidth - stampSize.width) / 2, y: 2),
+                withAttributes: stampAttributes
+            )
+
+            return stacked
+        }
+
         let image = NSImage(size: NSSize(width: textSize.width + 2 + paceDotExtra, height: 18))
 
         image.lockFocus()

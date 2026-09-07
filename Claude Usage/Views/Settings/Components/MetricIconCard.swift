@@ -66,17 +66,22 @@ struct MetricIconCard: View {
                 }
 
                 // Metric-specific options
-                if (metricType == .session || metricType == .week) && (config.iconStyle == .battery || config.iconStyle == .progressBar) {
+                if (metricType == .session || metricType == .week)
+                    && (config.iconStyle == .battery || config.iconStyle == .progressBar || config.iconStyle == .percentageOnly) {
                     Divider()
                         .padding(.vertical, Spacing.xs)
 
                     SessionDisplayOptions(config: $config, onConfigChanged: onConfigChanged)
-                } else if metricType == .week && config.iconStyle == .percentageOnly {
+                }
+
+                if metricType == .week && config.iconStyle == .percentageOnly {
                     Divider()
                         .padding(.vertical, Spacing.xs)
 
                     WeekDisplayOptions(config: $config, onConfigChanged: onConfigChanged)
-                } else if metricType == .api {
+                }
+
+                if metricType == .api {
                     Divider()
                         .padding(.vertical, Spacing.xs)
 
